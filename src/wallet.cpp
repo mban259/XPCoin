@@ -1961,13 +1961,13 @@ bool CWallet::CreateCoinStake(uint256 &hashTx, uint32_t nOut, uint32_t nGenerati
     while (true)
     {
         // Set output amount
-        if (fMaxTimeWeight)
-            txNew.vout[1].nValue = nCredit - nMinFee;
-        else
-        {
-            txNew.vout[1].nValue = ((nCredit - nMinFee) / 2 / CENT) * CENT;
-            txNew.vout[2].nValue = nCredit - nMinFee - txNew.vout[1].nValue;
-        }
+        //if (fMaxTimeWeight)
+        txNew.vout[1].nValue = nCredit - nMinFee;
+        //else
+        //{
+        //    txNew.vout[1].nValue = ((nCredit - nMinFee) / 2 / CENT) * CENT;
+        //    txNew.vout[2].nValue = nCredit - nMinFee - txNew.vout[1].nValue;
+        //}
 
         // Sign
         int nIn = 0;
