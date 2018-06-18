@@ -1896,59 +1896,59 @@ bool CWallet::CreateCoinStake(uint256 &hashTx, uint32_t nOut, uint32_t nGenerati
         return false;
 
     bool fMaxTimeWeight = false;
-    if (GetWeight((int64_t)wtx.nTime, (int64_t)nGenerationTime) == nStakeMaxAge)
+    //if (GetWeight((int64_t)wtx.nTime, (int64_t)nGenerationTime) == nStakeMaxAge)
+    //{
+    // Only one output for old kernel inputs
+    txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
+
+    // Iterate through set of (wtx*, nout) in order to find some additional inputs for our new coinstake transaction.
+    //
+    // * Value is higher than 0.01 XP;
+    // * Only add inputs of the same key/address as kernel;
+    // * Input hash and kernel parent hash should be different.
+    for(CoinsSet::iterator pcoin = setCoins.begin(); pcoin != setCoins.end(); pcoin++)
     {
-        // Only one output for old kernel inputs
-        txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
+        // Stop adding more inputs if already too many inputs
+        if (txNew.vin.size() >= 100)
+            break;
+        // Stop adding more inputs if value is already pretty significant
+        if (nCredit > nCombineThreshold)
+            break;
+        // Stop adding inputs if reached reserve limit
+        if (nCredit + pcoin->first->vout[pcoin->second].nValue > nBalance - nReserveBalance)
+            break;
 
-        // Iterate through set of (wtx*, nout) in order to find some additional inputs for our new coinstake transaction.
-        //
-        // * Value is higher than 0.01 XP;
-        // * Only add inputs of the same key/address as kernel;
-        // * Input hash and kernel parent hash should be different.
-        for(CoinsSet::iterator pcoin = setCoins.begin(); pcoin != setCoins.end(); pcoin++)
-        {
-            // Stop adding more inputs if already too many inputs
-            if (txNew.vin.size() >= 100)
-                break;
-            // Stop adding more inputs if value is already pretty significant
-            if (nCredit > nCombineThreshold)
-                break;
-            // Stop adding inputs if reached reserve limit
-            if (nCredit + pcoin->first->vout[pcoin->second].nValue > nBalance - nReserveBalance)
-                break;
+        int64_t nTimeWeight = GetWeight((int64_t)pcoin->first->nTime, (int64_t)nGenerationTime);
 
-            int64_t nTimeWeight = GetWeight((int64_t)pcoin->first->nTime, (int64_t)nGenerationTime);
+        // Do not add input that is still too young
+        if (nTimeWeight < nStakeMaxAge)
+            continue;
+        // Do not add input if key/address is not the same as kernel
+        if (pcoin->first->vout[pcoin->second].scriptPubKey != scriptPubKeyKernel && pcoin->first->vout[pcoin->second].scriptPubKey != txNew.vout[1].scriptPubKey)
+            continue;
+        // Do not add input if parents are the same
+        if (pcoin->first->GetHash() != txNew.vin[0].prevout.hash)
+            continue;
+        // Do not add additional significant input
+        if (pcoin->first->vout[pcoin->second].nValue > nCombineThreshold)
+            continue;
 
-            // Do not add input that is still too young
-            if (nTimeWeight < nStakeMaxAge)
-                continue;
-            // Do not add input if key/address is not the same as kernel
-            if (pcoin->first->vout[pcoin->second].scriptPubKey != scriptPubKeyKernel && pcoin->first->vout[pcoin->second].scriptPubKey != txNew.vout[1].scriptPubKey)
-                continue;
-            // Do not add input if parents are the same
-            if (pcoin->first->GetHash() != txNew.vin[0].prevout.hash)
-                continue;
-            // Do not add additional significant input
-            if (pcoin->first->vout[pcoin->second].nValue > nCombineThreshold)
-                continue;
-
-            txNew.vin.push_back(CTxIn(pcoin->first->GetHash(), pcoin->second));
-            nCredit += pcoin->first->vout[pcoin->second].nValue;
-            vwtxPrev.push_back(pcoin->first);
-        }
-
-        fMaxTimeWeight = true;
+        txNew.vin.push_back(CTxIn(pcoin->first->GetHash(), pcoin->second));
+        nCredit += pcoin->first->vout[pcoin->second].nValue;
+        vwtxPrev.push_back(pcoin->first);
     }
-    else
-    {
-        // Split stake input if maximum weight isn't reached yet
-        txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
-        txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
 
-        if (fDebug && GetBoolArg("-printcoinstake"))
-            printf("CreateCoinStake : maximum time weight isn't reached, splitting coinstake\n");
-    }
+    fMaxTimeWeight = true;
+    //}
+    //else
+    //{
+    //    // Split stake input if maximum weight isn't reached yet
+    //    txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
+    //    txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
+
+    //    if (fDebug && GetBoolArg("-printcoinstake"))
+    //        printf("CreateCoinStake : maximum time weight isn't reached, splitting coinstake\n");
+    //}
 
     // Calculate coin age reward
     uint64_t nCoinAge;
